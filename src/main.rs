@@ -28,19 +28,19 @@ fn main() -> anyhow::Result<()> {
         .context("Failed to get background atom ID")?
         .atom();
 
-    let prop_reply = get_property(c, false, root, bg_atom, ATOM_PIXMAP, 0, 1)
+    let prop = get_property(c, false, root, bg_atom, ATOM_PIXMAP, 0, 1)
         .get_reply()
         .context("Failed to get background pixmap")?;
 
-    if prop_reply.format() != 32 {
-        bail!("Unexpected pixmap reply format: {}", prop_reply.format());
+    if prop.format() != 32 {
+        bail!("Unexpected pixmap reply format: {}", prop.format());
     }
 
-    if prop_reply.value_len() != 1 {
-        bail!("Unexpected pixmap reply length: {}", prop_reply.value_len());
+    if prop.value_len() != 1 {
+        bail!("Unexpected pixmap reply length: {}", prop.value_len());
     }
 
-    let pixmap: Pixmap = prop_reply.value()[0];
+    let pixmap: Pixmap = prop.value()[0];
     let geometry = get_geometry(c, pixmap)
         .get_reply()
         .context("Failed to grab background geometry")?;
