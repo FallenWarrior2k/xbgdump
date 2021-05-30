@@ -1,0 +1,11 @@
+[package]
+name = "xbgdump"
+version = "0.1.0"
+authors = ["FallenWarrior2k <mail@fallenwarrior.me>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.40"
+image = { version = "0.23.14", default-features = false, features = ["png"] }
+imageproc = { version = "0.22.0", default-features = false }
+xcb = "0.9.0"
