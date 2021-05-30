@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, Context};
 use image::{Bgra, DynamicImage, ImageBuffer, Rgb, Rgba};
 use imageproc::map::map_pixels;
-use std::convert::TryInto;
+use std::{convert::TryInto, env::args_os};
 use xcb::{
     ffi::XCB_IMAGE_FORMAT_Z_PIXMAP, get_geometry, get_image, get_property, intern_atom, Pixmap,
     ATOM_PIXMAP,
@@ -17,6 +17,15 @@ type BgraImage = ImageBuffer<Bgra<u8>, Vec<u8>>;
 // Pixmap grabbing based on https://github.com/polybar/polybar
 
 fn main() -> anyhow::Result<()> {
+    // Skip argv[0]
+    let mut args = args_os().fuse().skip(1);
+    let out_file = args.next().unwrap_or_else(|| "bg.png".into());
+
+    // Fuse needed since first .next() might've already been None
+    if args.next() != None {
+        bail!("Too many arguments.");
+    }
+
     let (c, _) = &xcb::Connection::connect(None)?;
 
     let root = c
@@ -80,7 +89,7 @@ fn main() -> anyhow::Result<()> {
         depth => bail!("Unsupported pixel depth: {}", depth),
     };
 
-    image.save("bg.png").context("Failed to save image")?;
+    image.save(out_file).context("Failed to save image")?;
 
     Ok(())
 }
