@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use image::{Bgra, ImageBuffer, Rgb};
 use imageproc::map::map_pixels;
 use std::convert::TryInto;
@@ -31,8 +31,14 @@ fn main() -> anyhow::Result<()> {
     let prop_reply = get_property(c, false, root, bg_atom, ATOM_PIXMAP, 0, 1)
         .get_reply()
         .context("Failed to get background pixmap")?;
-    assert_eq!(prop_reply.format(), 32);
-    assert_eq!(prop_reply.value_len(), 1);
+
+    if prop_reply.format() != 32 {
+        bail!("Unexpected pixmap reply format: {}", prop_reply.format());
+    }
+
+    if prop_reply.value_len() != 1 {
+        bail!("Unexpected pixmap reply length: {}", prop_reply.value_len());
+    }
 
     let pixmap: Pixmap = prop_reply.value()[0];
     let geometry = get_geometry(c, pixmap)
@@ -52,7 +58,9 @@ fn main() -> anyhow::Result<()> {
     .get_reply()
     .context("Failed to grab background contents")?;
 
-    assert_eq!(image.depth(), 24);
+    if image.depth() != 24 {
+        bail!("Unsupported pixel depth: {}", image.depth());
+    }
 
     BgraImage::from_raw(
         geometry.width().into(),
