@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, Context};
-use image::{Bgra, DynamicImage, ImageBuffer, Rgb, Rgba};
+use image::{Bgra, DynamicImage, ImageBuffer, ImageOutputFormat, Rgb, Rgba};
 use imageproc::map::map_pixels;
-use std::{convert::TryInto, env::args_os};
+use std::{convert::TryInto, env::args_os, io::stdout};
 use xcb::{
     ffi::XCB_IMAGE_FORMAT_Z_PIXMAP, get_geometry, get_image, get_property, intern_atom, Pixmap,
     ATOM_PIXMAP,
@@ -89,7 +89,13 @@ fn main() -> anyhow::Result<()> {
         depth => bail!("Unsupported pixel depth: {}", depth),
     };
 
-    image.save(out_file).context("Failed to save image")?;
+    if out_file == "-" {
+        image
+            .write_to(&mut stdout(), ImageOutputFormat::Png)
+            .context("Failed to write image")?;
+    } else {
+        image.save(out_file).context("Failed to save image")?;
+    }
 
     Ok(())
 }
