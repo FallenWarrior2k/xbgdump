@@ -22,8 +22,12 @@ fn main() -> anyhow::Result<()> {
     let out_file = args.next().unwrap_or_else(|| "bg.png".into());
 
     // Fuse needed since first .next() might've already been None
-    if args.next() != None {
-        bail!("Too many arguments.");
+    if args.next() != None || out_file == "--help" {
+        println!("USAGE: xbgdump <outfile>.png|-");
+        println!(
+            "xbgdump saves the current X11 background to the specified file (or stdout for -)."
+        );
+        return Ok(());
     }
 
     let (c, _) = &xcb::Connection::connect(None)?;
