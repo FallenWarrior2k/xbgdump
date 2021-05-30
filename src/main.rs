@@ -1,11 +1,14 @@
 use anyhow::{anyhow, bail, Context};
-use image::{Bgra, ImageBuffer, Rgb};
+use image::{Bgra, DynamicImage, ImageBuffer, Rgb, Rgba};
 use imageproc::map::map_pixels;
 use std::convert::TryInto;
 use xcb::{
     ffi::XCB_IMAGE_FORMAT_Z_PIXMAP, get_geometry, get_image, get_property, intern_atom, Pixmap,
     ATOM_PIXMAP,
 };
+
+const RGBA_DEPTH: u8 = 32;
+const RGB_DEPTH: u8 = 24;
 
 type BgraImage = ImageBuffer<Bgra<u8>, Vec<u8>>;
 
@@ -58,18 +61,26 @@ fn main() -> anyhow::Result<()> {
     .get_reply()
     .context("Failed to grab background contents")?;
 
-    if image.depth() != 24 {
-        bail!("Unsupported pixel depth: {}", image.depth());
-    }
-
-    BgraImage::from_raw(
+    let raw_image = BgraImage::from_raw(
         geometry.width().into(),
         geometry.height().into(),
         image.data().into(),
     )
-    .map(|img| map_pixels(&img, |_, _, Bgra([b, g, r, _])| Rgb([r, g, b])))
-    .ok_or_else(|| anyhow!("Failed to create image"))?
-    .save("bg.png")?;
+    .ok_or_else(|| anyhow!("Failed to create image"))?;
+
+    let image = match image.depth() {
+        RGBA_DEPTH => {
+            DynamicImage::ImageRgba8(map_pixels(&raw_image, |_, _, Bgra([b, g, r, a])| {
+                Rgba([r, g, b, a])
+            }))
+        }
+        RGB_DEPTH => DynamicImage::ImageRgb8(map_pixels(&raw_image, |_, _, Bgra([b, g, r, _])| {
+            Rgb([r, g, b])
+        })),
+        depth => bail!("Unsupported pixel depth: {}", depth),
+    };
+
+    image.save("bg.png").context("Failed to save image")?;
 
     Ok(())
 }
