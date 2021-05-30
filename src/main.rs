@@ -32,10 +32,10 @@ fn main() -> anyhow::Result<()> {
         .get_reply()
         .context("Failed to get background pixmap")?;
 
+    // This is what Polybar does and it works
     if prop.format() != 32 {
         bail!("Unexpected pixmap reply format: {}", prop.format());
     }
-
     if prop.value_len() != 1 {
         bail!("Unexpected pixmap reply length: {}", prop.value_len());
     }
@@ -53,7 +53,7 @@ fn main() -> anyhow::Result<()> {
         geometry.y(),
         geometry.width(),
         geometry.height(),
-        !0,
+        !0, // All planes; X doesn't about extra bits
     )
     .get_reply()
     .context("Failed to grab background contents")?;
