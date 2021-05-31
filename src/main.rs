@@ -1,7 +1,7 @@
 use anyhow::{bail, Context};
 use image::{Bgra, DynamicImage, ImageBuffer, ImageOutputFormat, Rgb, Rgba};
 use imageproc::map::map_pixels;
-use std::{env::args_os, io::stdout};
+use std::{borrow::Cow, env::args_os, ffi::OsStr, io::stdout};
 use x11rb::{
     connection::Connection,
     protocol::xproto::{AtomEnum, ConnectionExt, ImageFormat, Pixmap},
@@ -19,10 +19,13 @@ type BgraImage = ImageBuffer<Bgra<u8>, Vec<u8>>;
 fn main() -> anyhow::Result<()> {
     // Skip argv[0]
     let mut args = args_os().fuse().skip(1);
-    let out_file = args.next().unwrap_or_else(|| "bg.png".into());
+    let out_file: Cow<OsStr> = args
+        .next()
+        .map(Into::into)
+        .unwrap_or(OsStr::new("bg.png").into());
 
     // Fuse needed since first .next() might've already been None
-    if args.next() != None || out_file == "--help" {
+    if args.next() != None || out_file == OsStr::new("--help") {
         println!("USAGE: xbgdump <outfile>.png|-");
         println!(
             "xbgdump saves the current X11 background to the specified file (or stdout for -)."
@@ -91,7 +94,7 @@ fn main() -> anyhow::Result<()> {
         depth => bail!("Unsupported pixel depth: {}", depth),
     };
 
-    if out_file == "-" {
+    if out_file == OsStr::new("-") {
         image
             .write_to(&mut stdout(), ImageOutputFormat::Png)
             .context("Failed to write image")?;
