@@ -1,10 +1,10 @@
 use anyhow::{anyhow, bail, Context};
 use image::{Bgra, DynamicImage, ImageBuffer, ImageOutputFormat, Rgb, Rgba};
 use imageproc::map::map_pixels;
-use std::{convert::TryInto, env::args_os, io::stdout};
-use xcb::{
-    ffi::XCB_IMAGE_FORMAT_Z_PIXMAP, get_geometry, get_image, get_property, intern_atom, Pixmap,
-    ATOM_PIXMAP,
+use std::{env::args_os, io::stdout};
+use x11rb::{
+    connection::Connection,
+    protocol::xproto::{AtomEnum, ConnectionExt, ImageFormat, Pixmap},
 };
 
 const RGBA_DEPTH: u8 = 32;
@@ -30,58 +30,55 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let (c, _) = &xcb::Connection::connect(None)?;
+    let (c, screen_num) = x11rb::connect(None)?;
+    let root = c.setup().roots[screen_num].root;
 
-    let root = c
-        .get_setup()
-        .roots()
-        .next()
-        .ok_or_else(|| anyhow!("No screen???"))?
-        .root();
-
-    let bg_atom = intern_atom(c, true, "_XROOTPMAP_ID")
-        .get_reply()
+    let bg_atom = c
+        .intern_atom(true, b"_XROOTPMAP_ID")
+        .context("Failed to create cookie to retrieve background atom ID")?
+        .reply()
         .context("Failed to get background atom ID")?
-        .atom();
+        .atom;
 
-    let prop = get_property(c, false, root, bg_atom, ATOM_PIXMAP, 0, 1)
-        .get_reply()
+    let prop = c
+        .get_property(false, root, bg_atom, AtomEnum::PIXMAP, 0, 1)
+        .context("Failed to create cookie to get background pixmap")?
+        .reply()
         .context("Failed to get background pixmap")?;
 
     // This is what Polybar does and it works
-    if prop.format() != 32 {
-        bail!("Unexpected pixmap reply format: {}", prop.format());
-    }
-    if prop.value_len() != 1 {
-        bail!("Unexpected pixmap reply length: {}", prop.value_len());
+    let mut value_iter = prop
+        .value32()
+        .with_context(|| format!("Unexpected pixmap reply format {}", prop.format))?;
+    let pixmap: Pixmap = value_iter.next().context("No background pixmap set")?;
+    if value_iter.next() != None {
+        bail!("Unexpected pixmap reply length: {}", prop.value_len);
     }
 
-    let pixmap: Pixmap = prop.value()[0];
-    let geometry = get_geometry(c, pixmap)
-        .get_reply()
+    let geometry = c
+        .get_geometry(pixmap)
+        .context("Failed to create cookie to retrieve background geometry")?
+        .reply()
         .context("Failed to grab background geometry")?;
 
-    let image = get_image(
-        c,
-        XCB_IMAGE_FORMAT_Z_PIXMAP.try_into().unwrap(),
-        pixmap,
-        geometry.x(),
-        geometry.y(),
-        geometry.width(),
-        geometry.height(),
-        !0, // All planes; X doesn't about extra bits
-    )
-    .get_reply()
-    .context("Failed to grab background contents")?;
+    let image = c
+        .get_image(
+            ImageFormat::Z_PIXMAP,
+            pixmap,
+            geometry.x,
+            geometry.y,
+            geometry.width,
+            geometry.height,
+            !0, // All planes; X doesn't about extra bits
+        )
+        .context("Failed to create cookie to retrieve background contents")?
+        .reply()
+        .context("Failed to grab background contents")?;
 
-    let raw_image = BgraImage::from_raw(
-        geometry.width().into(),
-        geometry.height().into(),
-        image.data().into(),
-    )
-    .ok_or_else(|| anyhow!("Failed to create image"))?;
+    let raw_image = BgraImage::from_raw(geometry.width.into(), geometry.height.into(), image.data)
+        .ok_or_else(|| anyhow!("Failed to create image"))?;
 
-    let image = match image.depth() {
+    let image = match image.depth {
         // I haven't actually tested this; it's just conjecture from 24-bit being BGR0
         RGBA_DEPTH => {
             DynamicImage::ImageRgba8(map_pixels(&raw_image, |_, _, Bgra([b, g, r, a])| {
