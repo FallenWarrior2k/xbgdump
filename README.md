@@ -1,5 +1,7 @@
 # xbgdump
 
+[![CI](https://github.com/FallenWarrior2k/xbgdump/actions/workflows/ci.yml/badge.svg)](https://github.com/FallenWarrior2k/xbgdump/actions/workflows/ci.yml)
+
 `xbgdump` is a simple tool to dump the current X11 background to an image file.
 
 You can use it like `xbgdump file.png` or `xbgdump -` to send data to stdout. By default, it writes to the file `bg.png` in the current directory.
