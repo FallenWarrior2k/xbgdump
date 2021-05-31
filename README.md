@@ -1,6 +1,7 @@
 # xbgdump
 
 [![CI](https://github.com/FallenWarrior2k/xbgdump/actions/workflows/ci.yml/badge.svg)](https://github.com/FallenWarrior2k/xbgdump/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/xbgdump)](https://crates.io/crates/xbgdump)
 
 `xbgdump` is a simple tool to dump the current X11 background to an image file.
 
