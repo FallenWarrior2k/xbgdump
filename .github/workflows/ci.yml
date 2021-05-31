@@ -117,7 +117,7 @@ jobs:
         with:
           name: xbgdump
       - name: Create release
-        uses: marvinpinto/actions-automatic-releases@v1.2
+        uses: marvinpinto/action-automatic-releases@v1.2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           prerelease: false
