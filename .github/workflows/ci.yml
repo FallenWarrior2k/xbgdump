@@ -84,6 +84,7 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+    needs: check
     steps:
       - name: Download binary
         uses: actions/download-artifact@v2
