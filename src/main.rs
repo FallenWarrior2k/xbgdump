@@ -55,7 +55,7 @@ fn main() -> anyhow::Result<()> {
         .with_context(|| format!("Unexpected pixmap reply format {}", prop.format))?;
     let pixmap: Pixmap = value_iter.next().context("No background pixmap set")?;
     if value_iter.next() != None {
-        bail!("Unexpected pixmap reply length: {}", prop.value_len);
+        bail!("Too many values in pixmap reply");
     }
 
     let geometry = c
