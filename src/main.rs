@@ -26,7 +26,7 @@ fn main() -> anyhow::Result<()> {
 
     // Fuse needed since first .next() might've already been None
     if args.next() != None || out_file == OsStr::new("--help") {
-        println!("USAGE: xbgdump <outfile>.png|-");
+        println!("USAGE: xbgdump [<outfile>.png|<outfile>.pam|-]");
         println!(
             "xbgdump saves the current X11 background to the specified file (or stdout for -)."
         );

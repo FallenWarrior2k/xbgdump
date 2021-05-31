@@ -4,9 +4,9 @@
 
 `xbgdump` is a simple tool to dump the current X11 background to an image file.
 
-You can use it like `xbgdump file.png` or `xbgdump -` to send data to stdout. By default, it writes to the file `bg.png` in the current directory.
+You can use it like `xbgdump file.png` or `xbgdump -` to send data to stdout. By default, it writes to the file `bg.png` in the current directory. For efficiency reasons, data sent to stdout is encoded as PAM instead of PNG. Beside a noticeable speedup, this should not make any difference when piping into ImageMagick or similar.
 
-For now, only PNG is supported, but in theory, it should be easy to expand support to all formats supported by [image-rs](https://github.com/image-rs/image). Especially PAM looks interesting for piping to e.g. ImageMagick, as the PNG encoding is by far the most expensive step at the moment, yet wasted work if the image immediately gets decoded again for further processing.
+For now, only PNG and PAM are supported, but in theory, it should be easy to expand support to all formats supported by [image-rs](https://github.com/image-rs/image).
 
 ## Motivation
 
