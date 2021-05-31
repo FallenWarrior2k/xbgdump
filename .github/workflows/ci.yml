@@ -65,10 +65,13 @@ jobs:
       - name: Check and lint
         run: cargo clippy --verbose --locked --all-features
       - name: Build release binary
+        if: matrix.rust == 'stable'
         run: cargo build --verbose --locked --all-features --release --target x86_64-unknown-linux-musl
       - name: Strip binary
+        if: matrix.rust == 'stable'
         run: strip target/x86_64-unknown-linux-musl/release/xbgdump
-      - name: Upload release version
+      - name: Upload binary
+        if: matrix.rust == 'stable'
         uses: actions/upload-artifact@v2
         with:
           name: xbgdump
