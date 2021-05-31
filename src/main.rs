@@ -1,5 +1,5 @@
 use anyhow::{bail, Context};
-use image::{Bgra, DynamicImage, ImageBuffer, ImageOutputFormat, Rgb, Rgba};
+use image::{pnm::PNMSubtype, Bgra, DynamicImage, ImageBuffer, ImageOutputFormat, Rgb, Rgba};
 use imageproc::map::map_pixels;
 use std::{borrow::Cow, env::args_os, ffi::OsStr, io::stdout};
 use x11rb::{
@@ -96,7 +96,10 @@ fn main() -> anyhow::Result<()> {
 
     if out_file == OsStr::new("-") {
         image
-            .write_to(&mut stdout(), ImageOutputFormat::Png)
+            .write_to(
+                &mut stdout(),
+                ImageOutputFormat::Pnm(PNMSubtype::ArbitraryMap),
+            )
             .context("Failed to write image")?;
     } else {
         image.save(out_file).context("Failed to save image")?;
