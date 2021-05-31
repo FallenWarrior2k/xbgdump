@@ -51,8 +51,10 @@ jobs:
           path: |
             ~/.cargo/git
             ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-rust-${{ matrix.rust }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-rust-
+            ${{ runner.os }}-cargo-
       - name: Cache sccache artifacts
         uses: actions/cache@v2
         with:
