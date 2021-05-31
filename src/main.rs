@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context};
+use anyhow::{bail, Context};
 use image::{Bgra, DynamicImage, ImageBuffer, ImageOutputFormat, Rgb, Rgba};
 use imageproc::map::map_pixels;
 use std::{env::args_os, io::stdout};
@@ -76,7 +76,7 @@ fn main() -> anyhow::Result<()> {
         .context("Failed to grab background contents")?;
 
     let raw_image = BgraImage::from_raw(geometry.width.into(), geometry.height.into(), image.data)
-        .ok_or_else(|| anyhow!("Failed to create image"))?;
+        .context("Failed to create image")?;
 
     let image = match image.depth {
         // I haven't actually tested this; it's just conjecture from 24-bit being BGR0
