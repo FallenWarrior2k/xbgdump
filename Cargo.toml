@@ -8,6 +8,10 @@ repository = "https://github.com/FallenWarrior2k/xbgdump"
 license = "MIT"
 readme = "README.md"
 edition = "2018"
+exclude = [
+    ".github/**",
+    ".gitignore"
+]
 
 [dependencies]
 anyhow = "1.0.40"
