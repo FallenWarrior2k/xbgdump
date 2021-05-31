@@ -2,6 +2,11 @@
 name = "xbgdump"
 version = "0.1.0"
 authors = ["FallenWarrior2k <mail@fallenwarrior.me>"]
+description = "CLI tool to dump the X11 background to a file"
+homepage = "https://github.com/FallenWarrior2k/xbgdump"
+repository = "https://github.com/FallenWarrior2k/xbgdump"
+license = "MIT"
+readme = "README.md"
 edition = "2018"
 
 [dependencies]
