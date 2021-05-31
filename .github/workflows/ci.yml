@@ -82,9 +82,11 @@ jobs:
       - name: Stop sccache server
         run: sccache --stop-server || true
       - name: Save version
+        if: matrix.rust == 'stable'
         run: |
           cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "xbgdump") | .version' > VERSION
       - name: Upload version
+        if: matrix.rust == 'stable'
         uses: actions/upload-artifact@v2
         with:
           name: version
