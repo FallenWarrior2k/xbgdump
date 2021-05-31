@@ -82,6 +82,7 @@ fn main() -> anyhow::Result<()> {
     .ok_or_else(|| anyhow!("Failed to create image"))?;
 
     let image = match image.depth() {
+        // I haven't actually tested this; it's just conjecture from 24-bit being BGR0
         RGBA_DEPTH => {
             DynamicImage::ImageRgba8(map_pixels(&raw_image, |_, _, Bgra([b, g, r, a])| {
                 Rgba([r, g, b, a])
