@@ -5,7 +5,7 @@ on:
 
 jobs:
   check:
-    name: Check
+    name: Check (Rust ${{ matrix.rust }})
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.experimental }}
     strategy:
