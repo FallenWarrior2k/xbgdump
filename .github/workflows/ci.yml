@@ -13,7 +13,7 @@ jobs:
         rust:
           - stable
           - beta
-          - nightly
+        experimental: [false]
         include:
           - rust: nightly
             experimental: true
