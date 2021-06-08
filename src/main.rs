@@ -1,6 +1,7 @@
 use anyhow::{bail, Context};
-use image::{pnm::PNMSubtype, Bgra, DynamicImage, ImageBuffer, ImageOutputFormat, Rgb, Rgba};
-use imageproc::map::map_pixels;
+use image::{
+    buffer::ConvertBuffer, pnm::PNMSubtype, Bgra, DynamicImage, ImageBuffer, ImageOutputFormat,
+};
 use std::{borrow::Cow, env::args_os, ffi::OsStr, io::stdout};
 use x11rb::{
     connection::Connection,
@@ -83,14 +84,8 @@ fn main() -> anyhow::Result<()> {
 
     let processed_image = match image_x.depth {
         // I haven't actually tested this; it's just conjecture from 24-bit being BGR0
-        RGBA_DEPTH => {
-            DynamicImage::ImageRgba8(map_pixels(&bgra, |_, _, Bgra([b, g, r, a])| {
-                Rgba([r, g, b, a])
-            }))
-        }
-        RGB_DEPTH => DynamicImage::ImageRgb8(map_pixels(&bgra, |_, _, Bgra([b, g, r, _])| {
-            Rgb([r, g, b])
-        })),
+        RGBA_DEPTH => DynamicImage::ImageRgba8(bgra.convert()),
+        RGB_DEPTH => DynamicImage::ImageRgb8(bgra.convert()),
         depth => bail!("Unsupported pixel depth {}.", depth),
     };
 
