@@ -64,7 +64,7 @@ fn main() -> anyhow::Result<()> {
         .reply()
         .context("Failed to grab background geometry.")?;
 
-    let image = c
+    let image_x = c
         .get_image(
             ImageFormat::Z_PIXMAP,
             pixmap,
@@ -78,31 +78,33 @@ fn main() -> anyhow::Result<()> {
         .reply()
         .context("Failed to grab background contents.")?;
 
-    let raw_image = BgraImage::from_raw(geometry.width.into(), geometry.height.into(), image.data)
+    let bgra = BgraImage::from_raw(geometry.width.into(), geometry.height.into(), image_x.data)
         .context("Failed to create image.")?;
 
-    let image = match image.depth {
+    let processed_image = match image_x.depth {
         // I haven't actually tested this; it's just conjecture from 24-bit being BGR0
         RGBA_DEPTH => {
-            DynamicImage::ImageRgba8(map_pixels(&raw_image, |_, _, Bgra([b, g, r, a])| {
+            DynamicImage::ImageRgba8(map_pixels(&bgra, |_, _, Bgra([b, g, r, a])| {
                 Rgba([r, g, b, a])
             }))
         }
-        RGB_DEPTH => DynamicImage::ImageRgb8(map_pixels(&raw_image, |_, _, Bgra([b, g, r, _])| {
+        RGB_DEPTH => DynamicImage::ImageRgb8(map_pixels(&bgra, |_, _, Bgra([b, g, r, _])| {
             Rgb([r, g, b])
         })),
         depth => bail!("Unsupported pixel depth {}.", depth),
     };
 
     if out_file == OsStr::new("-") {
-        image
+        processed_image
             .write_to(
                 &mut stdout(),
                 ImageOutputFormat::Pnm(PNMSubtype::ArbitraryMap),
             )
             .context("Failed to write image.")?;
     } else {
-        image.save(out_file).context("Failed to save image.")?;
+        processed_image
+            .save(out_file)
+            .context("Failed to save image.")?;
     }
 
     Ok(())
