@@ -16,7 +16,7 @@ exclude = [
 [dependencies]
 anyhow = "1.0.40"
 image = { version = "0.23.14", default-features = false, features = ["png", "pnm"] }
-x11rb = "0.8.1"
+x11rb = { version = "0.8.1", features = ["randr"] }
 
 [profile.release]
 lto = true
