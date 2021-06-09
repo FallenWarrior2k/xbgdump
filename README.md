@@ -7,6 +7,8 @@
 
 You can use it like `xbgdump file.png` or `xbgdump -` to send data to stdout. By default, it writes to the file `bg.png` in the current directory. For efficiency reasons, data sent to stdout is encoded as PAM instead of PNG. Beside a noticeable speedup, this should not make any difference when piping into ImageMagick or similar.
 
+When given the `-m` (or `--mask`) flag, `xbgdump` will query the current screen layout with RandR and mask off-screen areas with transparency. For more details, consult the help with `xbgdump -h`.
+
 For now, only PNG and PAM are supported, but in theory, it should be easy to expand support to all formats supported by [image-rs](https://github.com/image-rs/image).
 
 ## Motivation
