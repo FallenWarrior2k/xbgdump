@@ -1,4 +1,5 @@
 use anyhow::{bail, Context};
+use getopts::Options;
 use image::{
     buffer::ConvertBuffer, pnm::PNMSubtype, Bgra, DynamicImage, GenericImage, ImageBuffer,
     ImageOutputFormat, Rgba,
@@ -7,7 +8,6 @@ use std::{
     borrow::Cow,
     convert::{TryFrom, TryInto},
     env::args_os,
-    ffi::OsStr,
     io::stdout,
 };
 use x11rb::{
@@ -26,28 +26,53 @@ const RGB_DEPTH: u8 = 24;
 
 type BgraImage = ImageBuffer<Bgra<u8>, Vec<u8>>;
 
+fn print_usage(program: &str, opts: Options) {
+    print!(
+        "{}",
+        opts.usage(&format!(
+            "USAGE: {} [options] [<outfile>.png|<outfile>.pam|-]\n\
+    xbgdump saves the current X11 background to the specified file (or stdout for -).",
+            program
+        ))
+    )
+}
+
 // Image grabbing logic based on https://github.com/neXromancers/shotgun and
 // https://www.apriorit.com/dev-blog/672-lin-how-to-take-multi-monitor-screenshots-on-linux
 // Pixmap grabbing based on https://github.com/polybar/polybar
 
 fn main() -> anyhow::Result<()> {
-    // Skip argv[0]
-    let mut args = args_os().fuse().skip(1);
-    let out_file: Cow<OsStr> = args
-        .next()
-        .map(Into::into)
-        .unwrap_or(OsStr::new("bg.png").into());
+    let args: Vec<_> = args_os().map(Cow::from).collect();
+    let (program, args) = args
+        .split_first()
+        .map(|(p, a)| (p.to_string_lossy(), a))
+        .unwrap_or(("xbgdump".into(), &[]));
 
-    let mask_offscreen = true;
+    let mut opts = Options::new();
+    opts.optflag("m", "mask", "Mask off-screen areas with full transparency.");
+    opts.optflag("h", "help", "Show this help.");
 
-    // Fuse needed since first .next() might've already been None
-    if args.next() != None || out_file == OsStr::new("--help") {
-        println!("USAGE: xbgdump [<outfile>.png|<outfile>.pam|-]");
-        println!(
-            "xbgdump saves the current X11 background to the specified file (or stdout for -)."
-        );
+    let parsed = opts.parse(args)?;
+
+    if parsed.opt_present("h") || parsed.free.len() > 1 {
+        print_usage(program.as_ref(), opts);
+        // TODO: Exit code
+        // Rust makes this very complicated
+        // The only stable way to set the exit code is to use std::process::exit(), which has the
+        // issue of not running destructors.
+        // Setting the exit code via regular control flow requires the unstable Termination trait,
+        // which is provided for Result, but always calls Debug::fmt in the error case, so there's
+        // no way to silently exit with an error status without custom types.
         return Ok(());
     }
+
+    let out_file: Cow<_> = parsed
+        .free
+        .first()
+        .map(Into::into)
+        .unwrap_or("bg.png".into());
+
+    let mask_offscreen = parsed.opt_present("m");
 
     let (c, screen_num) = x11rb::connect(None)?;
     let root = c.setup().roots[screen_num].root;
@@ -182,7 +207,7 @@ fn main() -> anyhow::Result<()> {
         rgb
     };
 
-    if out_file == OsStr::new("-") {
+    if out_file == "-" {
         processed_image
             .write_to(
                 &mut stdout(),
@@ -191,7 +216,7 @@ fn main() -> anyhow::Result<()> {
             .context("Failed to write image.")?;
     } else {
         processed_image
-            .save(out_file)
+            .save(out_file.as_ref())
             .context("Failed to save image.")?;
     }
 
