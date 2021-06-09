@@ -1,8 +1,8 @@
 use anyhow::{bail, Context};
 use getopts::Options;
 use image::{
-    buffer::ConvertBuffer, pnm::PNMSubtype, Bgra, DynamicImage, GenericImage, ImageBuffer,
-    ImageOutputFormat, Rgba,
+    buffer::ConvertBuffer, pnm::PNMSubtype, Bgra, DynamicImage, GenericImage, GenericImageView,
+    ImageBuffer, ImageOutputFormat, Rgba,
 };
 use std::{
     borrow::Cow,
@@ -17,7 +17,7 @@ use x11rb::{
         randr::{
             ConnectionExt as RRConnectionExt, GetCrtcInfoReply, GetScreenResourcesCurrentReply,
         },
-        xproto::{AtomEnum, ConnectionExt, ImageFormat, Pixmap},
+        xproto::{AtomEnum, ConnectionExt, ImageFormat, Pixmap, Window},
     },
 };
 
@@ -72,11 +72,36 @@ fn main() -> anyhow::Result<()> {
         .map(Into::into)
         .unwrap_or("bg.png".into());
 
-    let mask_offscreen = parsed.opt_present("m");
+    let mask = parsed.opt_present("m");
 
     let (c, screen_num) = x11rb::connect(None)?;
     let root = c.setup().roots[screen_num].root;
 
+    let raw_bg = get_background(&c, root).context("Failed to get background image.")?;
+
+    let processed_image = if mask {
+        mask_offscreen(&c, root, raw_bg).context("Failed to mask off-screen areas.")?
+    } else {
+        raw_bg
+    };
+
+    if out_file == "-" {
+        processed_image
+            .write_to(
+                &mut stdout(),
+                ImageOutputFormat::Pnm(PNMSubtype::ArbitraryMap),
+            )
+            .context("Failed to write image.")?;
+    } else {
+        processed_image
+            .save(out_file.as_ref())
+            .context("Failed to save image.")?;
+    }
+
+    Ok(())
+}
+
+fn get_background(c: &impl Connection, root: Window) -> anyhow::Result<DynamicImage> {
     let bg_atom = c
         .intern_atom(true, b"_XROOTPMAP_ID")
         .context("Failed to create cookie to retrieve background atom ID.")?
@@ -122,103 +147,87 @@ fn main() -> anyhow::Result<()> {
     let bgra = BgraImage::from_raw(geometry.width.into(), geometry.height.into(), image_x.data)
         .context("Failed to create image.")?;
 
-    // Needs to be mutable for .sub_image(), even though it's never modified
-    let mut rgb = match image_x.depth {
+    match image_x.depth {
         // I haven't actually tested this; it's just conjecture from 24-bit being BGR0
-        RGBA_DEPTH => DynamicImage::ImageRgba8(bgra.convert()),
-        RGB_DEPTH => DynamicImage::ImageRgb8(bgra.convert()),
+        RGBA_DEPTH => Ok(DynamicImage::ImageRgba8(bgra.convert())),
+        RGB_DEPTH => Ok(DynamicImage::ImageRgb8(bgra.convert())),
         depth => bail!("Unsupported pixel depth {}.", depth),
+    }
+}
+
+fn mask_offscreen(
+    c: &impl Connection,
+    root: Window,
+    // Needs to be mutable for .sub_image(), even though it's never modified
+    mut raw_bg: DynamicImage,
+) -> anyhow::Result<DynamicImage> {
+    // Largely inspired by the similar code in shotgun
+    let GetScreenResourcesCurrentReply {
+        config_timestamp,
+        crtcs,
+        ..
+    } = c
+        .randr_get_screen_resources_current(root)
+        .context("Failed to create cookie to retrieve RandR resources.")?
+        .reply()
+        .context("Failed to retrieve RandR resources. Is RandR supported?")?;
+
+    let crtc_info_cookies = crtcs
+        .into_iter()
+        .map(|crtc| c.randr_get_crtc_info(crtc, config_timestamp))
+        .collect::<Result<Vec<_>, _>>()
+        .context("Failed to create cookies to retrieve screen layout.")?;
+    let crtc_infos = crtc_info_cookies
+        .into_iter()
+        .map(Cookie::reply)
+        .collect::<Result<Vec<_>, _>>()
+        .context("Failed to retrieve screen layout.")?;
+
+    match crtc_infos.len() {
+        0 => bail!("RandR reports zero screens."),
+        1 => return Ok(raw_bg),
+        _ => {}
     };
 
-    let processed_image = if mask_offscreen {
-        // Largely inspired by the similar code in shotgun
-        let GetScreenResourcesCurrentReply {
-            config_timestamp,
-            crtcs,
-            ..
-        } = c
-            .randr_get_screen_resources_current(root)
-            .context("Failed to create cookie to retrieve RandR resources.")?
-            .reply()
-            .context("Failed to retrieve RandR resources. Is RandR supported?")?;
-
-        let crtc_info_cookies = crtcs
-            .into_iter()
-            .map(|crtc| c.randr_get_crtc_info(crtc, config_timestamp))
-            .collect::<Result<Vec<_>, _>>()
-            .context("Failed to create cookies to retrieve screen layout.")?;
-        let crtc_infos = crtc_info_cookies
-            .into_iter()
-            .map(Cookie::reply)
-            .collect::<Result<Vec<_>, _>>()
-            .context("Failed to retrieve screen layout.")?;
-
-        match crtc_infos.len() {
-            0 => bail!("RandR reports zero screens."),
-            1 => rgb,
-            _ => {
-                let mut masked = ImageBuffer::from_pixel(
-                    geometry.width.into(),
-                    geometry.height.into(),
-                    Rgba([0, 0, 0, 0]),
-                );
-                for GetCrtcInfoReply {
-                    x,
-                    y,
-                    width,
-                    height,
-                    ..
-                } in crtc_infos
-                {
-                    if i32::from(x) + i32::from(width) < 0 || i32::from(y) + i32::from(height) < 0 {
-                        // No on-screen portions, nothing to do
-                        continue;
-                    }
-
-                    // Do some clamping in case we're not entirely on-screen
-                    // I don't know if that's even possible for the root window,
-                    // but having the code is better than randomly tripping an assertion.
-                    let (x, width): (u32, u32) = if x < 0 {
-                        // Unwrap safe because width + x >= 0
-                        (0, u32::try_from(i32::from(width) + i32::from(x)).unwrap())
-                    } else {
-                        // Unwrap safe because x >= 0 at this point
-                        (x.try_into().unwrap(), width.into())
-                    };
-                    let (y, height): (u32, u32) = if y < 0 {
-                        // Unwrap safe because height + y >= 0
-                        (0, u32::try_from(i32::from(height) + i32::from(y)).unwrap())
-                    } else {
-                        // Unwrap safe because y >= 0 at this point
-                        (y.try_into().unwrap(), height.into())
-                    };
-
-                    let area = rgb.sub_image(x, y, width, height);
-                    masked.copy_from(&area, x, y).expect(
-                        "Failed to copy on-screen areas into final result. \
-                        This is a bug in the sizing calculations.",
-                    );
-                }
-
-                DynamicImage::ImageRgba8(masked)
-            }
+    let (total_width, total_height) = raw_bg.dimensions();
+    let mut masked = ImageBuffer::from_pixel(total_width, total_height, Rgba([0, 0, 0, 0]));
+    for GetCrtcInfoReply {
+        x,
+        y,
+        width,
+        height,
+        ..
+    } in crtc_infos
+    {
+        if i32::from(x) + i32::from(width) < 0 || i32::from(y) + i32::from(height) < 0 {
+            // No on-screen portions, nothing to do
+            continue;
         }
-    } else {
-        rgb
-    };
 
-    if out_file == "-" {
-        processed_image
-            .write_to(
-                &mut stdout(),
-                ImageOutputFormat::Pnm(PNMSubtype::ArbitraryMap),
-            )
-            .context("Failed to write image.")?;
-    } else {
-        processed_image
-            .save(out_file.as_ref())
-            .context("Failed to save image.")?;
+        // Do some clamping in case we're not entirely on-screen
+        // I don't know if that's even possible for the root window,
+        // but having the code is better than randomly tripping an assertion.
+        let (x, width): (u32, u32) = if x < 0 {
+            // Unwrap safe because width + x >= 0
+            (0, u32::try_from(i32::from(width) + i32::from(x)).unwrap())
+        } else {
+            // Unwrap safe because x >= 0 at this point
+            (x.try_into().unwrap(), width.into())
+        };
+        let (y, height): (u32, u32) = if y < 0 {
+            // Unwrap safe because height + y >= 0
+            (0, u32::try_from(i32::from(height) + i32::from(y)).unwrap())
+        } else {
+            // Unwrap safe because y >= 0 at this point
+            (y.try_into().unwrap(), height.into())
+        };
+
+        let area = raw_bg.sub_image(x, y, width, height);
+        masked.copy_from(&area, x, y).expect(
+            "Failed to copy on-screen areas into final result. \
+                        This is a bug in the sizing calculations.",
+        );
     }
 
-    Ok(())
+    Ok(DynamicImage::ImageRgba8(masked))
 }
