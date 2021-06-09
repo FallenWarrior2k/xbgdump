@@ -21,4 +21,4 @@ I knew [polybar](https://github.com/polybar/polybar) inspects the background to 
 
 `xbgdump` works by retrieving the pixmap attached to the X root window under the property `_XROOTPMAP_ID`. This property is set by [feh](https://github.com/derf/feh) and nitrogen; I have not tested this with other wallpaper-setting tools or desktop environments yet.
 
-For 8-bit RGB, the contents of this pixmap are returned by [xcb](https://github.com/rtbo/rust-xcb) as BGR0, which is then converted to RGB before being encoded as PNG and output to the given file or stdout.
+For 8-bit RGB, the contents of this pixmap are returned by X11 as BGR0—I don't know if this is actually documented somewhere; I found out through trial and error—which is then converted to RGB before being encoded as PNG and output to the given file or stdout.
