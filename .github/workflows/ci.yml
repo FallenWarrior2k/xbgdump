@@ -99,7 +99,7 @@ jobs:
     needs: check
     steps:
       - name: Download version file
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: version
       - name: Verify version parity
@@ -115,7 +115,7 @@ jobs:
     needs: verify-version
     steps:
       - name: Download binary
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: xbgdump
       - name: Create release
